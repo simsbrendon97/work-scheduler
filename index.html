@@ -229,7 +229,7 @@ function buildSchedule(emps, ct, closer, variant) {
         if(s.consec===1&&!isLast(e)) c1++;
         ratio+=s.totalWork/Math.max(1,s.totalWork+s.totalBreak)-0.05/Math.max(1,e.leaveTime-h);
         if(sl.includes('local')) localFair+=s.totalLocal;
-        tb+=variant===1?e.leaveTime-h:variant===2?n.charCodeAt(0):-(e.leaveTime-h);
+        tb+=(e.leaveTime-h)*100+(variant===0?n.charCodeAt(0):variant===1?-n.charCodeAt(0):0);
         if(isLast(e)&&n!==closer) {
           if(sl.includes('local')) lastWork+=1;
           else if(sl==='ground') lastWork+=0.3;
@@ -416,7 +416,7 @@ function gen() {
 
   let options;
   try {
-    options = [1, 0, 2].map(v => buildSchedule(baseEmps.map(e => ({...e})), ct, closer, v));
+    options = [0, 1, 2].map(v => buildSchedule(baseEmps.map(e => ({...e})), ct, closer, v));
   } catch(e) { return fail('Error: ' + e.message); }
 
   document.getElementById('ws').innerHTML = '';
