@@ -104,7 +104,7 @@ function showOpt(i) {
   document.querySelectorAll('.opt').forEach((o, j) => o.classList.toggle('on', j === i));
 }
 
-function addE() {
+function addE(leaveTime=10) {
   const id = ++uid;
   const d = document.createElement('div');
   d.className = 'card';
@@ -117,12 +117,12 @@ function addE() {
     <div class="row">
       <div>
         <label>Leave Time (PM)</label>
-        <input type="number" id="lv${id}" value="10" min="3" max="10" onchange="syncC()">
+        <input type="number" id="lv${id}" value="${leaveTime}" min="3" max="10" onchange="syncC()">
       </div>
     </div>
     <div class="chks">
       <label><input type="checkbox" id="nd${id}"> No Desk</label>
-      <label><input type="checkbox" id="go${id}" onchange="goChg(${id})"> Ground Only</label>
+      <label><input type="checkbox" id="go${id}" onchange="goChg(${id})"> No Local</label>
     </div>`;
   document.getElementById('el').appendChild(d);
   syncC();
@@ -459,7 +459,7 @@ document.addEventListener('click', e => {
   editCell(td, +td.dataset.opt, decodeURIComponent(td.dataset.emp), +td.dataset.h);
 });
 
-addE(); addE(); addE();
+addE(10); addE(10); addE(10); addE(9); addE(7);
 </script>
 </body>
 </html>
