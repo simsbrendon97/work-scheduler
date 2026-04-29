@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Scheduler</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#111827;color:#f3f4f6;min-height:100vh}
+.pg{display:none;padding:16px;max-width:640px;margin:0 auto}
+.pg.on{display:block}
+h1{font-size:1.3rem;color:#a78bfa;margin-bottom:16px}
+h2{font-size:.9rem;color:#9ca3af;margin:14px 0 8px}
+label{font-size:.8rem;color:#9ca3af;display:block;margin-bottom:3px}
+input[type=text],input[type=number],select{width:100%;padding:10px 12px;background:#1f2937;border:1px solid #374151;border-radius:8px;color:#f3f4f6;font-size:.95rem;margin-bottom:10px}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.card{background:#1f2937;border-radius:10px;padding:12px;margin-bottom:10px}
+.card-top{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.card-top input{margin:0;flex:1}
+.chks{display:flex;gap:16px;flex-wrap:wrap}
+.chks label{display:flex;align-items:center;gap:6px;color:#d1d5db;font-size:.85rem;cursor:pointer}
+.chks input[type=checkbox]{width:16px;height:16px;cursor:pointer}
+.btn{display:block;width:100%;padding:12px;border-radius:10px;border:none;font-size:.95rem;font-weight:600;cursor:pointer;margin-top:10px}
+.btn-p{background:#7c3aed;color:#fff}
+.btn-g{background:#374151;color:#fff}
+.btn-add{background:#065f46;color:#fff;margin-bottom:0}
+.btn-sm{width:auto;padding:5px 10px;font-size:.8rem;margin-top:0;border-radius:6px;background:#7f1d1d;color:#fca5a5;border:none;cursor:pointer}
+.err{background:#450a0a;color:#fca5a5;padding:10px;border-radius:8px;margin-top:10px;font-size:.85rem}
+.warn{background:#451a03;color:#fed7aa;padding:8px;border-radius:8px;margin-bottom:6px;font-size:.82rem}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;font-size:.75rem;width:100%}
+th,td{padding:7px 8px;border:1px solid #374151;text-align:center;white-space:nowrap}
+th{background:#1f2937;color:#9ca3af;font-size:.68rem}
+.nm{text-align:left;font-weight:600;color:#e5e7eb;padding-right:10px}
+.lo{background:#1e3a5f;color:#93c5fd}
+.gr{background:#14532d;color:#86efac}
+.de{background:#78350f;color:#fcd34d}
+.co{background:#3b0764;color:#d8b4fe}
+.br{background:#111827;color:#4b5563}
+.of{background:#000;color:#374151}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:.78rem}
+.li{display:flex;align-items:center;gap:5px}
+.ld{width:12px;height:12px;border-radius:3px}
+.stats{margin-top:12px;font-size:.8rem;color:#9ca3af}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tab{flex:1;padding:10px;border-radius:8px;border:1px solid #374151;background:#1f2937;color:#9ca3af;cursor:pointer;font-size:.85rem;font-weight:600}
+.tab.on{background:#7c3aed;color:#fff;border-color:#7c3aed}
+.opt{display:none}
+.opt.on{display:block}
+</style>
+</head>
+<body>
+
+<div class="pg on" id="p1">
+  <h1>Work Scheduler</h1>
+  <div class="row">
+    <div>
+      <label>Combine Time (PM hour)</label>
+      <input type="number" id="ct" value="7" min="3" max="9">
+    </div>
+    <div>
+      <label>Closer</label>
+      <select id="cs"><option value="">— select —</option></select>
+    </div>
+  </div>
+  <h2>Employees</h2>
+  <div id="el"></div>
+  <button class="btn btn-add" onclick="addE()">+ Add Employee</button>
+  <button class="btn btn-p" onclick="gen()">Generate Schedule</button>
+  <div id="er" style="display:none" class="err"></div>
+</div>
+
+<div class="pg" id="p2">
+  <button class="btn btn-g" onclick="go('p1')" style="margin-bottom:14px">← Back</button>
+  <h1>Schedule</h1>
+  <div class="legend">
+    <div class="li"><div class="ld lo"></div>Local</div>
+    <div class="li"><div class="ld gr"></div>Ground</div>
+    <div class="li"><div class="ld de"></div>Desk</div>
+    <div class="li"><div class="ld co"></div>Combined</div>
+  </div>
+  <div id="ws"></div>
+  <div class="tabs">
+    <button class="tab on" onclick="showOpt(0)" id="tab0">Option 1</button>
+    <button class="tab" onclick="showOpt(1)" id="tab1">Option 2</button>
+    <button class="tab" onclick="showOpt(2)" id="tab2">Option 3</button>
+  </div>
+  <div class="opt on" id="opt0"></div>
+  <div class="opt" id="opt1"></div>
+  <div class="opt" id="opt2"></div>
+</div>
+
+<script>
+let uid = 0;
+
+function go(id) {
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+}
+
+function showOpt(i) {
+  document.querySelectorAll('.tab').forEach((t, j) => t.classList.toggle('on', j === i));
+  document.querySelectorAll('.opt').forEach((o, j) => o.classList.toggle('on', j === i));
+}
+
+function addE() {
+  const id = ++uid;
+  const d = document.createElement('div');
+  d.className = 'card';
+  d.dataset.id = id;
+  d.innerHTML = `
+    <div class="card-top">
+      <input type="text" placeholder="Name" id="nm${id}" oninput="syncC()">
+      <button class="btn-sm" onclick="rmE(this)">Remove</button>
+    </div>
+    <div class="row">
+      <div>
+        <label>Leave Time (PM)</label>
+        <input type="number" id="lv${id}" value="10" min="3" max="10" onchange="syncC()">
+      </div>
+    </div>
+    <div class="chks">
+      <label><input type="checkbox" id="nd${id}"> No Desk</label>
+      <label><input type="checkbox" id="go${id}" onchange="goChg(${id})"> Ground Only</label>
+    </div>`;
+  document.getElementById('el').appendChild(d);
+  syncC();
+}
+
+function goChg(id) {
+  const isGO = document.getElementById(`go${id}`).checked;
+  const nd = document.getElementById(`nd${id}`);
+  if (isGO) { nd.checked = true; nd.disabled = true; }
+  else { nd.disabled = false; }
+}
+
+function rmE(btn) { btn.closest('.card').remove(); syncC(); }
+
+function syncC() {
+  const sel = document.getElementById('cs'), prev = sel.value;
+  sel.innerHTML = '<option value="">— select —</option>';
+  document.querySelectorAll('.card').forEach(c => {
+    const id = c.dataset.id;
+    const v = document.getElementById(`nm${id}`)?.value.trim();
+    const lv = parseInt(document.getElementById(`lv${id}`)?.value);
+    if (v && lv === 10) {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      if (v === prev) o.selected = true;
+      sel.appendChild(o);
+    }
+  });
+}
+
+function getEmps() {
+  return Array.from(document.querySelectorAll('.card')).map(c => {
+    const id = c.dataset.id;
+    return {
+      name: document.getElementById(`nm${id}`).value.trim(),
+      leaveTime: parseInt(document.getElementById(`lv${id}`).value) || 10,
+      noDesk: document.getElementById(`nd${id}`).checked,
+      groundOnly: document.getElementById(`go${id}`).checked,
+      consec: 0, totalWork: 0, totalBreak: 0
+    };
+  }).filter(e => e.name);
+}
+
+function buildSchedule(emps, ct, closer, variant) {
+  const hours = [2,3,4,5,6,7,8,9];
+  const canPos = (e,p) => !(p==='desk'&&e.noDesk)&&!(p==='local'&&e.groundOnly);
+
+  const genCandidates = (h, st) => {
+    const isCT = h>=ct, isLast = e=>e.leaveTime===h+1;
+    const present = emps.filter(e=>e.leaveTime>h);
+    const mustBrk = new Set(present.filter(e=>st[e.name].consec>=2).map(e=>e.name));
+    const canSlot = (e, slot) => {
+      if (mustBrk.has(e.name)) return isLast(e)&&slot==='desk'&&!e.noDesk;
+      return slot.split('+').every(p=>canPos(e,p));
+    };
+    const avail = present.filter(e=>!mustBrk.has(e.name));
+    const lastHrDesk = present.filter(e=>mustBrk.has(e.name)&&isLast(e)&&!e.noDesk);
+    const nextH=h+1, nc=emps.filter(e=>e.leaveTime>nextH).length;
+    const maxC1 = Math.max(0,nc-(nextH>9?0:nextH>=ct?2:3));
+    const genCfgs = pos => {
+      if (!isCT||pos.length<=1) return [pos];
+      if (pos.length===2) return [[pos.join('+')],[...pos]];
+      const [a,b,c]=pos;
+      return [[`${a}+${b}`,c],[`${a}+${c}`,b],[`${b}+${c}`,a],[a,b,c]];
+    };
+    // at h=9 try every valid slot for the closer that includes local
+    let preOptions = [{}];
+    if (h===9) {
+      const cl=avail.find(e=>e.name===closer);
+      if (!cl&&present.find(e=>e.name===closer)) return [];
+      if (cl) {
+        const cSlots = isCT ? ['local+ground','local+desk','local'] : ['local'];
+        preOptions = cSlots.filter(s=>canSlot(cl,s)).map(s=>({[cl.name]:s}));
+        if (!preOptions.length) return [];
+      }
+    }
+    const results = [];
+    for (const pre of preOptions) {
+      const free = [...avail.filter(e=>!(e.name in pre)), ...lastHrDesk];
+      const preCov = new Set();
+      Object.values(pre).forEach(s=>s.split('+').forEach(p=>preCov.add(p)));
+      const unc = ['local','ground','desk'].filter(p=>!preCov.has(p));
+      for (const slots of genCfgs(unc)) {
+        const go = (si,a,rem) => {
+          if (si===slots.length) { results.push({...pre,...a}); return; }
+          for (let j=0;j<rem.length;j++)
+            if (canSlot(rem[j],slots[si]))
+              go(si+1,{...a,[rem[j].name]:slots[si]},rem.filter((_,k)=>k!==j));
+        };
+        go(0,{},free);
+      }
+    }
+    const seen=new Set();
+    const uniq=results.filter(a=>{
+      const vals=Object.values(a);
+      if(vals.includes('local')&&vals.includes('ground+desk')) return false;
+      const k=JSON.stringify(Object.entries(a).sort());
+      return seen.has(k)?false:(seen.add(k),true);
+    });
+    const sc = a=>{
+      let c1=0,ratio=0,localFair=0,tb=0,lastWork=0;
+      for (const [n,sl] of Object.entries(a)) {
+        const e=emps.find(x=>x.name===n),s=st[n];
+        if(s.consec===1&&!isLast(e)) c1++;
+        ratio+=s.totalWork/Math.max(1,s.totalWork+s.totalBreak);
+        if(sl.includes('local')) localFair+=s.totalLocal;
+        tb+=variant===1?e.leaveTime-h:variant===2?n.charCodeAt(0):-(e.leaveTime-h);
+        if(isLast(e)&&n!==closer) {
+          if(sl.includes('local')) lastWork+=1;
+          else if(sl==='ground') lastWork+=0.3;
+          else if(sl==='desk') lastWork+=0.1;
+        }
+      }
+      const vals=Object.values(a);
+      const lgBonus = isCT ? (vals.includes('local+ground') ? -1 : vals.some(s=>s.includes('+')) ? 0 : 1) : 0;
+      const closerLo = (isCT&&h>=8&&!(a[closer]||'').includes('local')) ? 1 : 0;
+      return [lastWork,Math.max(0,c1-maxC1),Object.keys(a).length,lgBonus,closerLo,ratio,localFair,tb];
+    };
+    uniq.sort((a,b)=>{const sa=sc(a),sb=sc(b);for(let k=0;k<8;k++)if(sa[k]!==sb[k])return sa[k]-sb[k];return 0;});
+    return uniq;
+  };
+
+  const apply = (h,st,asgn) => {
+    const ns=Object.fromEntries(Object.entries(st).map(([n,s])=>[n,{...s}]));
+    for (const e of emps.filter(e=>e.leaveTime>h)) {
+      const sl=asgn[e.name]||'break', w=sl!=='break';
+      ns[e.name].consec=w?ns[e.name].consec+1:0;
+      w?ns[e.name].totalWork++:ns[e.name].totalBreak++;
+      if(sl.includes('local')) ns[e.name].totalLocal++;
+    }
+    return ns;
+  };
+
+  const solve = (hi,st) => {
+    if (hi===hours.length) return {};
+    const h=hours[hi];
+    if (!emps.some(e=>e.leaveTime>h)) return solve(hi+1,st);
+    for (const asgn of genCandidates(h,st)) {
+      const s=solve(hi+1,apply(h,st,asgn));
+      if (s!==null) { s[h]=asgn; return s; }
+    }
+    return null;
+  };
+
+  const init=Object.fromEntries(emps.map(e=>[e.name,{consec:0,totalWork:0,totalBreak:0,totalLocal:0}]));
+  const byHour=solve(0,init);
+  if (!byHour) throw new Error('No valid schedule found. Add more employees or reduce position restrictions.');
+
+  const sched=Object.fromEntries(emps.map(e=>[e.name,{}]));
+  let st=init;
+  for (const h of hours) {
+    const present=emps.filter(e=>e.leaveTime>h);
+    if (!present.length) continue;
+    const asgn=byHour?{...(byHour[h]||{})}:{};
+    for (const [nm,sl] of Object.entries({...asgn})) {
+      const emp=emps.find(e=>e.name===nm);
+      if (emp.leaveTime!==h+1||nm===closer) continue;
+      if (sl==='local'||sl==='local+ground') {
+        const pts=sl.split('+');
+        let swapped=false;
+        for (const [n] of Object.entries(asgn)) {
+          if (asgn[n]!=='desk') continue;
+          const de=emps.find(e=>e.name===n);
+          if (de.leaveTime===h+1||!pts.every(p=>canPos(de,p))) continue;
+          asgn[nm]='desk'; asgn[n]=sl; swapped=true; break;
+        }
+        if (!swapped&&sl==='local') {
+          for (const [n] of Object.entries(asgn)) {
+            if (asgn[n]!=='ground') continue;
+            const gr=emps.find(e=>e.name===n);
+            if (gr.leaveTime===h+1||!canPos(gr,'local')) continue;
+            asgn[nm]='ground'; asgn[n]='local'; break;
+          }
+        }
+      } else if (sl==='ground'&&!emp.noDesk) {
+        for (const [n] of Object.entries(asgn)) {
+          if (asgn[n]!=='desk') continue;
+          const de=emps.find(e=>e.name===n);
+          if (de.leaveTime===h+1) continue;
+          asgn[nm]='desk'; asgn[n]='ground'; break;
+        }
+      }
+    }
+    for (const e of present) sched[e.name][h]=asgn[e.name]||'break';
+    st=apply(h,st,asgn);
+  }
+
+  return {sched,warns:[],emps:emps.map(e=>({...e,...st[e.name]}))};
+}
+
+let schedData = [];
+
+function cellCls(a) {
+  if (!a) return 'of';
+  if (a === 'break') return 'br';
+  if (a.includes('+')) return 'co';
+  return {local:'lo',ground:'gr',desk:'de'}[a]||'';
+}
+
+function cellLbl(a) {
+  if (!a) return '—';
+  if (a === 'break') return 'Break';
+  if (!a.includes('+')) return a[0].toUpperCase()+a.slice(1);
+  return a.split('+').map(p=>p[0].toUpperCase()+p.slice(1,2)).join('+');
+}
+
+function editCell(td, optIdx, empName, h) {
+  const data = schedData[optIdx];
+  const emp = data.emps.find(e=>e.name===empName);
+  const ct = parseInt(document.getElementById('ct').value);
+  const isCT = h >= ct;
+  const slots = ['break'];
+  if (!emp.groundOnly) slots.push('local');
+  slots.push('ground');
+  if (!emp.noDesk) slots.push('desk');
+  if (isCT) {
+    if (!emp.groundOnly) slots.push('local+ground');
+    if (!emp.groundOnly && !emp.noDesk) slots.push('local+desk');
+    if (!emp.noDesk) slots.push('ground+desk');
+  }
+  const current = data.sched[empName][h] || 'break';
+  const sel = document.createElement('select');
+  sel.style.cssText = 'width:100%;background:#1f2937;color:#f3f4f6;border:none;font-size:.7rem;cursor:pointer;outline:none;';
+  slots.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = cellLbl(s);
+    if (s === current) o.selected = true;
+    sel.appendChild(o);
+  });
+  let committed = false;
+  sel.addEventListener('change', () => {
+    committed = true;
+    data.sched[empName][h] = sel.value;
+    td.className = cellCls(sel.value);
+    td.textContent = cellLbl(sel.value);
+  });
+  sel.addEventListener('blur', () => {
+    if (!committed) {
+      td.className = cellCls(current);
+      td.textContent = cellLbl(current);
+    }
+  });
+  td.textContent = '';
+  td.appendChild(sel);
+  sel.focus();
+}
+
+function renderTable(emps, sched, optIdx) {
+  const hours = [2, 3, 4, 5, 6, 7, 8, 9];
+  let t = '<table><thead><tr><th>Name</th>';
+  hours.forEach(h => t += `<th>${h}–${h+1}</th>`);
+  t += '</tr></thead><tbody>';
+  for (const emp of emps) {
+    t += `<tr><td class="nm">${emp.name}</td>`;
+    hours.forEach(h => {
+      const a = sched[emp.name][h];
+      if (a === undefined) {
+        t += `<td class="of">—</td>`;
+      } else {
+        const en = encodeURIComponent(emp.name);
+        t += `<td class="${cellCls(a)}" data-opt="${optIdx}" data-emp="${en}" data-h="${h}" style="cursor:pointer">${cellLbl(a)}</td>`;
+      }
+    });
+    t += '</tr>';
+  }
+  return t + '</tbody></table>';
+}
+
+function renderStats(emps) {
+  let t = '<div class="stats"><table><thead><tr><th>Name</th><th>Work hrs</th><th>Break hrs</th></tr></thead><tbody>';
+  for (const emp of emps) {
+    t += `<tr><td class="nm">${emp.name}</td><td>${emp.totalWork}</td><td>${emp.totalBreak}</td></tr>`;
+  }
+  return t + '</tbody></table></div>';
+}
+
+function gen() {
+  const baseEmps = getEmps();
+  const ct = parseInt(document.getElementById('ct').value);
+  const closer = document.getElementById('cs').value;
+  const er = document.getElementById('er');
+  const fail = m => { er.textContent = m; er.style.display = 'block'; };
+  er.style.display = 'none';
+
+  if (baseEmps.length < 2) return fail('Add at least 2 employees.');
+  if (!closer) return fail('Select a closer.');
+  const cl = baseEmps.find(e => e.name === closer);
+  if (!cl) return fail('Closer not found.');
+  if (cl.leaveTime !== 10) return fail('Closer must have a leave time of 10pm.');
+  if (cl.groundOnly) return fail('Closer cannot be ground-only.');
+
+  let options;
+  try {
+    options = [0, 1, 2].map(v => buildSchedule(baseEmps.map(e => ({...e})), ct, closer, v));
+  } catch(e) { return fail('Error: ' + e.message); }
+
+  document.getElementById('ws').innerHTML = '';
+
+  const seen = new Set();
+  const unique = options.filter(opt => {
+    const k = JSON.stringify(opt.sched);
+    return seen.has(k) ? false : (seen.add(k), true);
+  });
+
+  schedData = unique.map(opt => ({sched: opt.sched, emps: opt.emps}));
+
+  for (let i = 0; i < 3; i++) {
+    const tab = document.getElementById(`tab${i}`);
+    const panel = document.getElementById(`opt${i}`);
+    if (i >= unique.length) {
+      tab.style.display = 'none';
+      panel.innerHTML = '';
+    } else {
+      tab.style.display = '';
+      tab.textContent = `Option ${i+1}`;
+      const opt = unique[i];
+      const sorted = [...opt.emps].sort((a, b) => {
+        if (a.name === closer) return -1;
+        if (b.name === closer) return 1;
+        if (b.leaveTime !== a.leaveTime) return b.leaveTime - a.leaveTime;
+        return a.name.localeCompare(b.name);
+      });
+      panel.innerHTML = '<div class="scroll">' + renderTable(sorted, opt.sched, i) + '</div>' + renderStats(sorted);
+    }
+  }
+
+  showOpt(0);
+  go('p2');
+}
+
+document.addEventListener('click', e => {
+  const td = e.target.closest('td[data-opt]');
+  if (!td || td.querySelector('select')) return;
+  editCell(td, +td.dataset.opt, decodeURIComponent(td.dataset.emp), +td.dataset.h);
+});
+
+addE(); addE(); addE();
+</script>
+</body>
+</html>
