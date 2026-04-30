@@ -382,19 +382,48 @@ function editCell(td, optIdx, empName, h) {
   sel.focus();
 }
 
+function editName(td, optIdx, oldName) {
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = oldName;
+  inp.style.cssText = 'width:100%;background:transparent;color:#e5e7eb;border:none;font-size:.75rem;padding:0;outline:none;font-weight:600;';
+  const apply = newName => {
+    newName = newName.trim() || oldName;
+    td.textContent = newName;
+    td.dataset.name = encodeURIComponent(newName);
+    if (newName === oldName) return;
+    const data = schedData[optIdx];
+    data.sched[newName] = data.sched[oldName];
+    delete data.sched[oldName];
+    const emp = data.emps.find(e=>e.name===oldName);
+    if (emp) emp.name = newName;
+    const oldEn = encodeURIComponent(oldName), newEn = encodeURIComponent(newName);
+    document.querySelectorAll(`td[data-opt="${optIdx}"][data-emp="${oldEn}"]`)
+      .forEach(cell => cell.dataset.emp = newEn);
+  };
+  let committed = false;
+  inp.addEventListener('keydown', e => {
+    if (e.key==='Enter'||e.key==='Escape') { committed=true; apply(e.key==='Escape'?oldName:inp.value); }
+  });
+  inp.addEventListener('blur', () => { if (!committed) { committed=true; apply(inp.value); } });
+  td.textContent = '';
+  td.appendChild(inp);
+  inp.focus(); inp.select();
+}
+
 function renderTable(emps, sched, optIdx) {
   const hours = [2, 3, 4, 5, 6, 7, 8, 9];
   let t = '<table><thead><tr><th>Name</th>';
   hours.forEach(h => t += `<th>${h}–${h+1}</th>`);
   t += '</tr></thead><tbody>';
   for (const emp of emps) {
-    t += `<tr><td class="nm">${emp.name}</td>`;
+    const en = encodeURIComponent(emp.name);
+    t += `<tr><td class="nm" data-opt="${optIdx}" data-name="${en}" style="cursor:pointer">${emp.name}</td>`;
     hours.forEach(h => {
       const a = sched[emp.name][h];
       if (a === undefined) {
         t += `<td class="of">—</td>`;
       } else {
-        const en = encodeURIComponent(emp.name);
         t += `<td class="${cellCls(a)}" data-opt="${optIdx}" data-emp="${en}" data-h="${h}" style="cursor:pointer">${cellLbl(a)}</td>`;
       }
     });
@@ -479,8 +508,11 @@ function gen() {
 
 document.addEventListener('click', e => {
   const td = e.target.closest('td[data-opt]');
-  if (!td || td.querySelector('select')) return;
-  editCell(td, +td.dataset.opt, decodeURIComponent(td.dataset.emp), +td.dataset.h);
+  if (!td || td.querySelector('select') || td.querySelector('input')) return;
+  if ('h' in td.dataset)
+    editCell(td, +td.dataset.opt, decodeURIComponent(td.dataset.emp), +td.dataset.h);
+  else if ('name' in td.dataset)
+    editName(td, +td.dataset.opt, decodeURIComponent(td.dataset.name));
 });
 
 addE(10); addE(10); addE(10); addE(9); addE(7);
