@@ -169,6 +169,16 @@ function getEmps() {
 function buildSchedule(emps, ct, closer, variant) {
   const hours = [2,3,4,5,6,7,8,9];
   const canPos = (e,p) => !(p==='desk'&&e.noDesk)&&!(p==='local'&&e.groundOnly);
+  const tbFns = [
+    (e,n,h)=>(e.leaveTime-h)*100+n.charCodeAt(0),
+    (e,n,h)=>(e.leaveTime-h)*100-n.charCodeAt(0),
+    (e,n,h)=>(e.leaveTime-h)*100,
+    (e,n,h)=>n.charCodeAt(0),
+    (e,n,h)=>-n.charCodeAt(0),
+    (e,n,h)=>-(e.leaveTime-h)*100+n.charCodeAt(0),
+    (e,n,h)=>-(e.leaveTime-h)*100-n.charCodeAt(0),
+    (e,n,h)=>-(e.leaveTime-h)*100,
+  ];
 
   const genCandidates = (h, st) => {
     const isCT = h>=ct, isLast = e=>e.leaveTime===h+1;
@@ -228,8 +238,9 @@ function buildSchedule(emps, ct, closer, variant) {
         const e=emps.find(x=>x.name===n),s=st[n];
         if(s.consec===1&&!isLast(e)) c1++;
         ratio+=s.totalWork/Math.max(1,s.totalWork+s.totalBreak)-0.05/Math.max(1,e.leaveTime-h);
+        if(isCT&&sl==='desk'){if(s.lastSlot==='desk') ratio-=0.1; if(e.leaveTime>h+1) ratio-=0.1;}
         if(sl.includes('local')) localFair+=s.totalLocal;
-        tb+=(e.leaveTime-h)*100+(variant===0?n.charCodeAt(0):variant===1?-n.charCodeAt(0):0);
+        tb+=tbFns[variant%tbFns.length](e,n,h);
         if(isLast(e)&&n!==closer) {
           if(sl.includes('local')) lastWork+=1;
           else if(sl==='ground') lastWork+=0.3;
@@ -252,6 +263,7 @@ function buildSchedule(emps, ct, closer, variant) {
       ns[e.name].consec=w?ns[e.name].consec+1:0;
       w?ns[e.name].totalWork++:ns[e.name].totalBreak++;
       if(sl.includes('local')) ns[e.name].totalLocal++;
+      ns[e.name].lastSlot=sl;
     }
     return ns;
   };
@@ -267,7 +279,7 @@ function buildSchedule(emps, ct, closer, variant) {
     return null;
   };
 
-  const init=Object.fromEntries(emps.map(e=>[e.name,{consec:0,totalWork:0,totalBreak:0,totalLocal:0}]));
+  const init=Object.fromEntries(emps.map(e=>[e.name,{consec:0,totalWork:0,totalBreak:0,totalLocal:0,lastSlot:''}]));
   const byHour=solve(0,init);
   if (!byHour) throw new Error('No valid schedule found. Add more employees or reduce position restrictions.');
 
@@ -414,31 +426,43 @@ function gen() {
   if (cl.leaveTime !== 10) return fail('Closer must have a leave time of 10pm.');
   if (cl.groundOnly) return fail('Closer cannot be ground-only.');
 
-  let options;
-  try {
-    options = [0, 1, 2].map(v => buildSchedule(baseEmps.map(e => ({...e})), ct, closer, v));
-  } catch(e) { return fail('Error: ' + e.message); }
+  const candidates = [], errs = [];
+  for (let v = 0; v < 8; v++) {
+    try { candidates.push(buildSchedule(baseEmps.map(e=>({...e})), ct, closer, v)); }
+    catch(e) { errs.push(e); }
+  }
+  if (!candidates.length) return fail('Error: ' + errs[0].message);
+
+  const globalScore = opt => {
+    const ws = opt.emps.filter(e=>e.totalWork+e.totalBreak>0);
+    const wr = ws.map(e=>e.totalWork/Math.max(1,e.totalWork+e.totalBreak));
+    const lr = ws.map(e=>e.totalLocal/Math.max(1,e.totalWork));
+    const spread = arr => Math.max(...arr)-Math.min(...arr);
+    return [spread(wr), spread(lr)];
+  };
 
   document.getElementById('ws').innerHTML = '';
 
   const seen = new Set();
-  const unique = options.filter(opt => {
+  const unique = candidates.filter(opt => {
     const k = JSON.stringify(opt.sched);
     return seen.has(k) ? false : (seen.add(k), true);
   });
+  unique.sort((a,b)=>{const sa=globalScore(a),sb=globalScore(b);for(let k=0;k<2;k++)if(sa[k]!==sb[k])return sa[k]-sb[k];return 0;});
+  const top3 = unique.slice(0,3);
 
-  schedData = unique.map(opt => ({sched: opt.sched, emps: opt.emps}));
+  schedData = top3.map(opt => ({sched: opt.sched, emps: opt.emps}));
 
   for (let i = 0; i < 3; i++) {
     const tab = document.getElementById(`tab${i}`);
     const panel = document.getElementById(`opt${i}`);
-    if (i >= unique.length) {
+    if (i >= top3.length) {
       tab.style.display = 'none';
       panel.innerHTML = '';
     } else {
       tab.style.display = '';
       tab.textContent = `Option ${i+1}`;
-      const opt = unique[i];
+      const opt = top3[i];
       const sorted = [...opt.emps].sort((a, b) => {
         if (a.name === closer) return -1;
         if (b.name === closer) return 1;
