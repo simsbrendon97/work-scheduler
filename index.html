@@ -365,7 +365,7 @@ function cellCls(a) {
 function cellLbl(a) {
   if (!a) return '—';
   if (a === 'break') return 'Break';
-  if (!a.includes('+')) return a[0].toUpperCase()+a.slice(1);
+  if (!a.includes('+')) return a === 'ground' ? 'Grnd' : a[0].toUpperCase()+a.slice(1);
   return a.split('+').map(p=>p[0].toUpperCase()+p.slice(1,2)).join('+');
 }
 
