@@ -43,11 +43,6 @@ th{background:#1f2937;color:#9ca3af;font-size:.68rem}
 .li{display:flex;align-items:center;gap:5px}
 .ld{width:12px;height:12px;border-radius:3px}
 .stats{margin-top:12px;font-size:.8rem;color:#9ca3af}
-.tabs{display:flex;gap:8px;margin-bottom:12px}
-.tab{flex:1;padding:10px;border-radius:8px;border:1px solid #374151;background:#1f2937;color:#9ca3af;cursor:pointer;font-size:.85rem;font-weight:600}
-.tab.on{background:#7c3aed;color:#fff;border-color:#7c3aed}
-.opt{display:none}
-.opt.on{display:block}
 </style>
 </head>
 <body>
@@ -81,14 +76,8 @@ th{background:#1f2937;color:#9ca3af;font-size:.68rem}
     <div class="li"><div class="ld co"></div>Combined</div>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
   </div>
   <div id="ws"></div>
-  <div class="tabs">
-    <button class="tab on" onclick="showOpt(0)" id="tab0">Option 1</button>
-    <button class="tab" onclick="showOpt(1)" id="tab1">Option 2</button>
-    <button class="tab" onclick="showOpt(2)" id="tab2">Option 3</button>
-  </div>
-  <div class="opt on" id="opt0"></div>
-  <div class="opt" id="opt1"></div>
-  <div class="opt" id="opt2"></div>
+  <button class="btn btn-g" id="nextBtn" onclick="nextSched()" style="margin-bottom:12px">Regenerate</button>
+  <div id="schedOut"></div>
 </div>
 
 <script>
@@ -99,10 +88,6 @@ function go(id) {
   document.getElementById(id).classList.add('on');
 }
 
-function showOpt(i) {
-  document.querySelectorAll('.tab').forEach((t, j) => t.classList.toggle('on', j === i));
-  document.querySelectorAll('.opt').forEach((o, j) => o.classList.toggle('on', j === i));
-}
 
 function addE(leaveTime=10) {
   const id = ++uid;
@@ -166,24 +151,32 @@ function getEmps() {
   }).filter(e => e.name);
 }
 
-function buildSchedule(emps, ct, closer, variant) {
+function buildSchedule(emps, ct, closer, variant, noBreakRule = false) {
   const hours = [2,3,4,5,6,7,8,9];
   const canPos = (e,p) => !(p==='desk'&&e.noDesk)&&!(p==='local'&&e.groundOnly);
   const tbFns = [
     (e,n,h)=>(e.leaveTime-h)*100+n.charCodeAt(0),
     (e,n,h)=>(e.leaveTime-h)*100-n.charCodeAt(0),
+    (e,n,h)=>(e.leaveTime-h)*100+(n.charCodeAt(1)||0),
+    (e,n,h)=>(e.leaveTime-h)*100-(n.charCodeAt(1)||0),
     (e,n,h)=>(e.leaveTime-h)*100,
     (e,n,h)=>n.charCodeAt(0),
     (e,n,h)=>-n.charCodeAt(0),
+    (e,n,h)=>n.charCodeAt(0)*(e.leaveTime-h),
+    (e,n,h)=>-n.charCodeAt(0)*(e.leaveTime-h),
     (e,n,h)=>-(e.leaveTime-h)*100+n.charCodeAt(0),
     (e,n,h)=>-(e.leaveTime-h)*100-n.charCodeAt(0),
+    (e,n,h)=>-(e.leaveTime-h)*100+(n.charCodeAt(1)||0),
+    (e,n,h)=>-(e.leaveTime-h)*100-(n.charCodeAt(1)||0),
     (e,n,h)=>-(e.leaveTime-h)*100,
+    (e,n,h)=>(n.charCodeAt(0)+n.charCodeAt(1)||0),
+    (e,n,h)=>-(n.charCodeAt(0)+n.charCodeAt(1)||0),
   ];
 
   const genCandidates = (h, st) => {
     const isCT = h>=ct, isLast = e=>e.leaveTime===h+1;
     const present = emps.filter(e=>e.leaveTime>h);
-    const mustBrk = new Set(present.filter(e=>st[e.name].consec>=2).map(e=>e.name));
+    const mustBrk = noBreakRule ? new Set() : new Set(present.filter(e=>st[e.name].consec>=2).map(e=>e.name));
     const canSlot = (e, slot) => {
       if (mustBrk.has(e.name)) return isLast(e)&&slot==='desk'&&!e.noDesk;
       return slot.split('+').every(p=>canPos(e,p));
@@ -326,6 +319,33 @@ function buildSchedule(emps, ct, closer, variant) {
 }
 
 let schedData = [];
+let curOpt = 0;
+
+function renderOpt(i) {
+  const opt = schedData[i];
+  const closer = document.getElementById('cs').value;
+  const sorted = [...opt.emps].sort((a, b) => {
+    if (a.name === closer) return -1;
+    if (b.name === closer) return 1;
+    if (b.leaveTime !== a.leaveTime) return b.leaveTime - a.leaveTime;
+    return a.name.localeCompare(b.name);
+  });
+  document.getElementById('schedOut').innerHTML =
+    '<div class="scroll">' + renderTable(sorted, opt.sched, i) + '</div>' + renderStats(sorted);
+  const btn = document.getElementById('nextBtn');
+  if (schedData.length > 1) {
+    btn.textContent = 'Regenerate';
+    btn.disabled = false;
+  } else {
+    btn.textContent = 'No Alternatives';
+    btn.disabled = true;
+  }
+}
+
+function nextSched() {
+  curOpt = (curOpt + 1) % schedData.length;
+  renderOpt(curOpt);
+}
 
 function cellCls(a) {
   if (!a) return 'of';
@@ -380,6 +400,7 @@ function editCell(td, optIdx, empName, h) {
   td.textContent = '';
   td.appendChild(sel);
   sel.focus();
+  try { sel.showPicker(); } catch(_) {}
 }
 
 function editName(td, optIdx, oldName) {
@@ -456,11 +477,19 @@ function gen() {
   if (cl.groundOnly) return fail('Closer cannot be ground-only.');
 
   const candidates = [], errs = [];
-  for (let v = 0; v < 8; v++) {
+  for (let v = 0; v < 16; v++) {
     try { candidates.push(buildSchedule(baseEmps.map(e=>({...e})), ct, closer, v)); }
     catch(e) { errs.push(e); }
   }
-  if (!candidates.length) return fail('Error: ' + errs[0].message);
+  let relaxed = false;
+  if (!candidates.length) {
+    for (let v = 0; v < 16; v++) {
+      try { candidates.push(buildSchedule(baseEmps.map(e=>({...e})), ct, closer, v, true)); }
+      catch(e) {}
+    }
+    if (!candidates.length) return fail('Error: ' + errs[0].message);
+    relaxed = true;
+  }
 
   const globalScore = opt => {
     const ws = opt.emps.filter(e=>e.totalWork+e.totalBreak>0);
@@ -478,31 +507,10 @@ function gen() {
     return seen.has(k) ? false : (seen.add(k), true);
   });
   unique.sort((a,b)=>{const sa=globalScore(a),sb=globalScore(b);for(let k=0;k<2;k++)if(sa[k]!==sb[k])return sa[k]-sb[k];return 0;});
-  const top3 = unique.slice(0,3);
+  schedData = unique.slice(0,10).map(opt => ({sched: opt.sched, emps: opt.emps}));
 
-  schedData = top3.map(opt => ({sched: opt.sched, emps: opt.emps}));
-
-  for (let i = 0; i < 3; i++) {
-    const tab = document.getElementById(`tab${i}`);
-    const panel = document.getElementById(`opt${i}`);
-    if (i >= top3.length) {
-      tab.style.display = 'none';
-      panel.innerHTML = '';
-    } else {
-      tab.style.display = '';
-      tab.textContent = `Option ${i+1}`;
-      const opt = top3[i];
-      const sorted = [...opt.emps].sort((a, b) => {
-        if (a.name === closer) return -1;
-        if (b.name === closer) return 1;
-        if (b.leaveTime !== a.leaveTime) return b.leaveTime - a.leaveTime;
-        return a.name.localeCompare(b.name);
-      });
-      panel.innerHTML = '<div class="scroll">' + renderTable(sorted, opt.sched, i) + '</div>' + renderStats(sorted);
-    }
-  }
-
-  showOpt(0);
+  curOpt = 0;
+  renderOpt(0);
   go('p2');
 }
 
