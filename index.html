@@ -153,6 +153,12 @@ function getEmps() {
 
 function buildSchedule(emps, ct, closer, variant, noBreakRule = false) {
   const hours = [2,3,4,5,6,7,8,9];
+  const shuffled = [...emps];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = (variant * 7 + i * 13 + variant * i) % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  emps = shuffled;
   const canPos = (e,p) => !(p==='desk'&&e.noDesk)&&!(p==='local'&&e.groundOnly);
   const tbFns = [
     (e,n,h)=>(e.leaveTime-h)*100+n.charCodeAt(0),
@@ -477,13 +483,13 @@ function gen() {
   if (cl.groundOnly) return fail('Closer cannot be ground-only.');
 
   const candidates = [], errs = [];
-  for (let v = 0; v < 16; v++) {
+  for (let v = 0; v < 32; v++) {
     try { candidates.push(buildSchedule(baseEmps.map(e=>({...e})), ct, closer, v)); }
     catch(e) { errs.push(e); }
   }
   let relaxed = false;
   if (!candidates.length) {
-    for (let v = 0; v < 16; v++) {
+    for (let v = 0; v < 32; v++) {
       try { candidates.push(buildSchedule(baseEmps.map(e=>({...e})), ct, closer, v, true)); }
       catch(e) {}
     }
