@@ -427,7 +427,7 @@ function editName(td, optIdx, oldName) {
     const emp = data.emps.find(e=>e.name===oldName);
     if (emp) emp.name = newName;
     const oldEn = encodeURIComponent(oldName), newEn = encodeURIComponent(newName);
-    document.querySelectorAll(`td[data-opt="${optIdx}"][data-emp="${oldEn}"]`)
+    document.querySelectorAll(`[data-opt="${optIdx}"][data-emp="${oldEn}"]`)
       .forEach(cell => cell.dataset.emp = newEn);
   };
   let committed = false;
@@ -442,22 +442,25 @@ function editName(td, optIdx, oldName) {
 
 function renderTable(emps, sched, optIdx) {
   const hours = [2, 3, 4, 5, 6, 7, 8, 9];
-  let t = '<table><thead><tr><th>Name</th>';
-  hours.forEach(h => t += `<th>${h}–${h+1}</th>`);
-  t += '</tr></thead><tbody>';
+  let t = '<table><thead><tr><th style="font-size:.68rem;color:#9ca3af">Time</th>';
   for (const emp of emps) {
     const en = encodeURIComponent(emp.name);
-    t += `<tr><td class="nm" data-opt="${optIdx}" data-name="${en}" style="cursor:pointer">${emp.name}</td>`;
-    hours.forEach(h => {
+    t += `<th class="nm" data-opt="${optIdx}" data-name="${en}" style="cursor:pointer">${emp.name}</th>`;
+  }
+  t += '</tr></thead><tbody>';
+  hours.forEach(h => {
+    t += `<tr><td style="font-size:.68rem;color:#9ca3af;background:#1f2937;white-space:nowrap">${h}–${h+1}</td>`;
+    for (const emp of emps) {
+      const en = encodeURIComponent(emp.name);
       const a = sched[emp.name][h];
       if (a === undefined) {
         t += `<td class="of">—</td>`;
       } else {
         t += `<td class="${cellCls(a)}" data-opt="${optIdx}" data-emp="${en}" data-h="${h}" style="cursor:pointer">${cellLbl(a)}</td>`;
       }
-    });
+    }
     t += '</tr>';
-  }
+  });
   return t + '</tbody></table>';
 }
 
@@ -523,7 +526,7 @@ function gen() {
 }
 
 document.addEventListener('click', e => {
-  const td = e.target.closest('td[data-opt]');
+  const td = e.target.closest('[data-opt]');
   if (!td || td.querySelector('select') || td.querySelector('input')) return;
   if ('h' in td.dataset)
     editCell(td, +td.dataset.opt, decodeURIComponent(td.dataset.emp), +td.dataset.h);
