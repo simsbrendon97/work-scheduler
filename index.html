@@ -511,7 +511,27 @@ function gen() {
     const wr = ws.map(e=>e.totalWork/Math.max(1,e.totalWork+e.totalBreak));
     const lr = ws.map(e=>e.totalLocal/Math.max(1,e.totalWork));
     const spread = arr => Math.max(...arr)-Math.min(...arr);
-    return [spread(wr), spread(lr)];
+
+    const closerName = (opt.emps.find(e=>e.isCloser)||{}).name||'';
+    const workersAt = h => opt.emps
+      .filter(e=>opt.sched[e.name]&&opt.sched[e.name][h]&&opt.sched[e.name][h]!=='break')
+      .map(e=>e.name).sort();
+    const w8 = workersAt(8), w9 = workersAt(9);
+    let pairScore = 0;
+    // same two people working hours 8 and 9
+    const samePair = w8.length===2&&w9.length===2&&w8.join()===w9.join();
+    if (!samePair) pairScore += 2;
+    // closer does local+ground both hours
+    if ((opt.sched[closerName]||{})[9]!=='local+ground') pairScore += 1;
+    if ((opt.sched[closerName]||{})[8]!=='local+ground') pairScore += 0.5;
+    // other person does desk both hours
+    if (samePair && w9.length===2) {
+      const o9=w9.find(n=>n!==closerName), o8=w8.find(n=>n!==closerName);
+      if (o9&&opt.sched[o9][9]!=='desk') pairScore += 1;
+      if (o8&&opt.sched[o8][8]!=='desk') pairScore += 0.5;
+    }
+
+    return [pairScore, spread(wr), spread(lr)];
   };
 
   document.getElementById('ws').innerHTML = '';
