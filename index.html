@@ -51,12 +51,12 @@ th{background:#1f2937;color:#9ca3af;font-size:.68rem}
   <h1>Work Scheduler</h1>
   <div class="row">
     <div>
-      <label>Combine Time (PM hour)</label>
-      <input type="number" id="ct" value="7" min="3" max="9">
+      <label>Schedule Start (PM hour)</label>
+      <input type="number" id="st" value="2" min="2" max="9">
     </div>
     <div>
-      <label>Closer</label>
-      <select id="cs"><option value="">— select —</option></select>
+      <label>Combine Time (PM hour)</label>
+      <input type="number" id="ct" value="7" min="3" max="9">
     </div>
   </div>
   <h2>Employees</h2>
@@ -96,49 +96,48 @@ function addE(leaveTime=10) {
   d.dataset.id = id;
   d.innerHTML = `
     <div class="card-top">
-      <input type="text" placeholder="Name" id="nm${id}" oninput="syncC()">
+      <input type="text" placeholder="Name" id="nm${id}">
       <button class="btn-sm" onclick="rmE(this)">Remove</button>
     </div>
     <div class="row">
       <div>
         <label>Leave Time (PM)</label>
-        <input type="number" id="lv${id}" value="${leaveTime}" min="3" max="10" onchange="syncC()">
+        <input type="number" id="lv${id}" value="${leaveTime}" min="3" max="10">
       </div>
     </div>
     <div class="chks">
       <label><input type="checkbox" id="nd${id}"> No Desk</label>
       <label><input type="checkbox" id="go${id}" onchange="goChg(${id})"> No Local</label>
+      <label><input type="checkbox" id="cl${id}" onchange="closerChg(${id})"> Closer</label>
+      <label><input type="checkbox" id="sb${id}" onchange="startChg(${id},'sb')"> Start Break</label>
+      <label><input type="checkbox" id="s1${id}" onchange="startChg(${id},'s1')"> Start 1hr</label>
     </div>`;
   document.getElementById('el').appendChild(d);
-  syncC();
 }
 
 function goChg(id) {
   const isGO = document.getElementById(`go${id}`).checked;
   const nd = document.getElementById(`nd${id}`);
-  if (isGO) { nd.checked = true; nd.disabled = true; }
+  if (isGO) { nd.checked = true; nd.disabled = true; document.getElementById(`cl${id}`).checked = false; }
   else { nd.disabled = false; }
 }
 
-function rmE(btn) { btn.closest('.card').remove(); syncC(); }
-
-function syncC() {
-  const sel = document.getElementById('cs'), prev = sel.value;
-  sel.innerHTML = '<option value="">— select —</option>';
-  document.querySelectorAll('.card').forEach(c => {
-    const id = c.dataset.id;
-    const v = document.getElementById(`nm${id}`)?.value.trim();
-    const lv = parseInt(document.getElementById(`lv${id}`)?.value);
-    const nd = document.getElementById(`nd${id}`)?.checked;
-    if (v && lv === 10 && !nd) {
-      const o = document.createElement('option');
-      o.value = v; o.textContent = v;
-      if (v === prev) o.selected = true;
-      sel.appendChild(o);
-    }
-  });
-  if (sel.options.length === 2 && sel.value === '') sel.selectedIndex = 1;
+function closerChg(id) {
+  if (document.getElementById(`cl${id}`).checked) {
+    document.querySelectorAll('.card').forEach(c => {
+      if (c.dataset.id != id) document.getElementById(`cl${c.dataset.id}`).checked = false;
+    });
+  }
 }
+
+function startChg(id, which) {
+  if (which === 'sb' && document.getElementById(`sb${id}`).checked)
+    document.getElementById(`s1${id}`).checked = false;
+  else if (which === 's1' && document.getElementById(`s1${id}`).checked)
+    document.getElementById(`sb${id}`).checked = false;
+}
+
+function rmE(btn) { btn.closest('.card').remove(); }
 
 function getEmps() {
   return Array.from(document.querySelectorAll('.card')).map(c => {
@@ -148,13 +147,16 @@ function getEmps() {
       leaveTime: parseInt(document.getElementById(`lv${id}`).value) || 10,
       noDesk: document.getElementById(`nd${id}`).checked,
       groundOnly: document.getElementById(`go${id}`).checked,
+      isCloser: document.getElementById(`cl${id}`).checked,
+      startBreak: document.getElementById(`sb${id}`).checked,
+      startOneCon: document.getElementById(`s1${id}`).checked,
       consec: 0, totalWork: 0, totalBreak: 0
     };
   }).filter(e => e.name);
 }
 
-function buildSchedule(emps, ct, closer, variant, noBreakRule = false) {
-  const hours = [2,3,4,5,6,7,8,9];
+function buildSchedule(emps, ct, closer, variant, noBreakRule = false, startTime = 2) {
+  const hours = Array.from({length: 10 - startTime}, (_, i) => startTime + i);
   const shuffled = [...emps];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = (variant * 7 + i * 13 + variant * i) % (i + 1);
@@ -280,7 +282,7 @@ function buildSchedule(emps, ct, closer, variant, noBreakRule = false) {
     return null;
   };
 
-  const init=Object.fromEntries(emps.map(e=>[e.name,{consec:0,totalWork:0,totalBreak:0,totalLocal:0,lastSlot:''}]));
+  const init=Object.fromEntries(emps.map(e=>[e.name,{consec:e.startBreak?2:e.startOneCon?1:0,totalWork:0,totalBreak:0,totalLocal:0,lastSlot:''}]));
   const byHour=solve(0,init);
   if (!byHour) throw new Error('No valid schedule found. Add more employees or reduce position restrictions.');
 
@@ -331,15 +333,15 @@ let curOpt = 0;
 
 function renderOpt(i) {
   const opt = schedData[i];
-  const closer = document.getElementById('cs').value;
+  const closerName = (opt.emps.find(e => e.isCloser) || {}).name || '';
   const sorted = [...opt.emps].sort((a, b) => {
-    if (a.name === closer) return -1;
-    if (b.name === closer) return 1;
+    if (a.name === closerName) return -1;
+    if (b.name === closerName) return 1;
     if (b.leaveTime !== a.leaveTime) return b.leaveTime - a.leaveTime;
     return a.name.localeCompare(b.name);
   });
   document.getElementById('schedOut').innerHTML =
-    '<div class="scroll">' + renderTable(sorted, opt.sched, i) + '</div>' + renderStats(sorted);
+    '<div class="scroll">' + renderTable(sorted, opt.sched, i, opt.startTime) + '</div>' + renderStats(sorted);
   const btn = document.getElementById('nextBtn');
   if (schedData.length > 1) {
     btn.textContent = 'Regenerate';
@@ -440,8 +442,8 @@ function editName(td, optIdx, oldName) {
   inp.focus(); inp.select();
 }
 
-function renderTable(emps, sched, optIdx) {
-  const hours = [2, 3, 4, 5, 6, 7, 8, 9];
+function renderTable(emps, sched, optIdx, startTime = 2) {
+  const hours = Array.from({length: 10 - startTime}, (_, i) => startTime + i);
   let t = '<table><thead><tr><th style="font-size:.68rem;color:#9ca3af">Time</th>';
   for (const emp of emps) {
     const en = encodeURIComponent(emp.name);
@@ -475,27 +477,29 @@ function renderStats(emps) {
 function gen() {
   const baseEmps = getEmps();
   const ct = parseInt(document.getElementById('ct').value);
-  const closer = document.getElementById('cs').value;
+  const startTime = parseInt(document.getElementById('st').value);
   const er = document.getElementById('er');
   const fail = m => { er.textContent = m; er.style.display = 'block'; };
   er.style.display = 'none';
 
   if (baseEmps.length < 2) return fail('Add at least 2 employees.');
-  if (!closer) return fail('Select a closer.');
-  const cl = baseEmps.find(e => e.name === closer);
-  if (!cl) return fail('Closer not found.');
+  const closers = baseEmps.filter(e => e.isCloser);
+  if (!closers.length) return fail('Check a Closer on one employee.');
+  if (closers.length > 1) return fail('Only one Closer can be selected.');
+  const cl = closers[0], closer = cl.name;
   if (cl.leaveTime !== 10) return fail('Closer must have a leave time of 10pm.');
-  if (cl.groundOnly) return fail('Closer cannot be ground-only.');
+  if (cl.groundOnly) return fail('Closer cannot be No Local.');
+  if (cl.noDesk) return fail('Closer cannot be No Desk.');
 
   const candidates = [], errs = [];
   for (let v = 0; v < 32; v++) {
-    try { candidates.push(buildSchedule(baseEmps.map(e=>({...e})), ct, closer, v)); }
+    try { candidates.push(buildSchedule(baseEmps.map(e=>({...e})), ct, closer, v, false, startTime)); }
     catch(e) { errs.push(e); }
   }
   let relaxed = false;
   if (!candidates.length) {
     for (let v = 0; v < 32; v++) {
-      try { candidates.push(buildSchedule(baseEmps.map(e=>({...e})), ct, closer, v, true)); }
+      try { candidates.push(buildSchedule(baseEmps.map(e=>({...e})), ct, closer, v, true, startTime)); }
       catch(e) {}
     }
     if (!candidates.length) return fail('Error: ' + errs[0].message);
@@ -518,7 +522,7 @@ function gen() {
     return seen.has(k) ? false : (seen.add(k), true);
   });
   unique.sort((a,b)=>{const sa=globalScore(a),sb=globalScore(b);for(let k=0;k<2;k++)if(sa[k]!==sb[k])return sa[k]-sb[k];return 0;});
-  schedData = unique.slice(0,10).map(opt => ({sched: opt.sched, emps: opt.emps}));
+  schedData = unique.slice(0,10).map(opt => ({sched: opt.sched, emps: opt.emps, startTime}));
 
   curOpt = 0;
   renderOpt(0);
