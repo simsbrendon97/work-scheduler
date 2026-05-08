@@ -186,7 +186,11 @@ function buildSchedule(emps, ct, closer, variant, noBreakRule = false, startTime
   const genCandidates = (h, st) => {
     const isCT = h>=ct, isLast = e=>e.leaveTime===h+1;
     const present = emps.filter(e=>e.leaveTime>h);
-    const mustBrk = noBreakRule ? new Set() : new Set(present.filter(e=>st[e.name].consec>=2).map(e=>e.name));
+    const mustBrk = noBreakRule ? new Set() : new Set([
+      ...present.filter(e=>st[e.name].consec>=2).map(e=>e.name),
+      // always break desk-eligible closing employees at h=7 so they enter h=8 with consec=0
+      ...(h===7 ? present.filter(e=>e.name!==closer&&e.leaveTime>9&&!e.noDesk).map(e=>e.name) : [])
+    ]);
     const canSlot = (e, slot) => {
       if (mustBrk.has(e.name)) return isLast(e)&&slot==='desk'&&!e.noDesk;
       return slot.split('+').every(p=>canPos(e,p));
@@ -249,8 +253,6 @@ function buildSchedule(emps, ct, closer, variant, noBreakRule = false, startTime
           else if(sl==='ground') lastWork+=0.3;
           else if(sl==='desk') lastWork+=0.1;
         }
-        // don't burn the closing desk person's break at h=7 — they need to be fresh for h=8+
-        if(h===7&&n!==closer&&e.leaveTime>9&&!e.noDesk&&s.consec===1) ratio+=1.0;
       }
       const vals=Object.values(a);
       const lgBonus = isCT ? (vals.includes('local+ground') ? -1 : vals.some(s=>s.includes('+')) ? 0 : 1) : 0;
