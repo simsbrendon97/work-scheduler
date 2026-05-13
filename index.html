@@ -102,24 +102,60 @@ function addE(leaveTime=10) {
     <div class="row">
       <div>
         <label>Leave Time (PM)</label>
-        <input type="number" id="lv${id}" value="${leaveTime}" min="3" max="10">
+        <input type="number" id="lv${id}" value="${leaveTime}" min="3" max="10" oninput="checkCloserEligibility(${id})">
       </div>
     </div>
     <div class="chks">
-      <label><input type="checkbox" id="nd${id}"> No Desk</label>
+      <label><input type="checkbox" id="nd${id}" onchange="checkCloserEligibility(${id})"> No Desk</label>
       <label><input type="checkbox" id="go${id}" onchange="goChg(${id})"> No Local</label>
-      <label><input type="checkbox" id="cl${id}" onchange="closerChg(${id})"> Closer</label>
+      <label id="cll${id}"><input type="checkbox" id="cl${id}" onchange="closerChg(${id})"> Closer</label>
       <label><input type="checkbox" id="sb${id}" onchange="startChg(${id},'sb')"> Start Break</label>
       <label><input type="checkbox" id="s1${id}" onchange="startChg(${id},'s1')"> Start 1hr</label>
     </div>`;
   document.getElementById('el').appendChild(d);
+  checkCloserEligibility(id);
+}
+
+function checkCloserEligibility(id) {
+  const lv = parseInt(document.getElementById(`lv${id}`).value);
+  const nd = document.getElementById(`nd${id}`).checked;
+  const go = document.getElementById(`go${id}`).checked;
+  const cl = document.getElementById(`cl${id}`);
+  const label = document.getElementById(`cll${id}`);
+  const eligible = lv === 10 && !nd && !go;
+  if (!eligible) {
+    cl.checked = false;
+    cl.disabled = true;
+    label.style.opacity = '0.4';
+    label.style.cursor = 'not-allowed';
+  } else {
+    cl.disabled = false;
+    label.style.opacity = '';
+    label.style.cursor = '';
+  }
+  autoSelectCloser();
+}
+
+function autoSelectCloser() {
+  const cards = Array.from(document.querySelectorAll('.card'));
+  const hasCloser = cards.some(c => {
+    const cl = document.getElementById(`cl${c.dataset.id}`);
+    return cl && cl.checked;
+  });
+  if (!hasCloser) {
+    for (const c of cards) {
+      const cl = document.getElementById(`cl${c.dataset.id}`);
+      if (cl && !cl.disabled) { cl.checked = true; break; }
+    }
+  }
 }
 
 function goChg(id) {
   const isGO = document.getElementById(`go${id}`).checked;
   const nd = document.getElementById(`nd${id}`);
-  if (isGO) { nd.checked = true; nd.disabled = true; document.getElementById(`cl${id}`).checked = false; }
+  if (isGO) { nd.checked = true; nd.disabled = true; }
   else { nd.disabled = false; }
+  checkCloserEligibility(id);
 }
 
 function closerChg(id) {
@@ -127,6 +163,8 @@ function closerChg(id) {
     document.querySelectorAll('.card').forEach(c => {
       if (c.dataset.id != id) document.getElementById(`cl${c.dataset.id}`).checked = false;
     });
+  } else {
+    autoSelectCloser();
   }
 }
 
@@ -137,7 +175,7 @@ function startChg(id, which) {
     document.getElementById(`sb${id}`).checked = false;
 }
 
-function rmE(btn) { btn.closest('.card').remove(); }
+function rmE(btn) { btn.closest('.card').remove(); autoSelectCloser(); }
 
 function getEmps() {
   return Array.from(document.querySelectorAll('.card')).map(c => {
