@@ -586,9 +586,7 @@ function gen() {
     return [pairScore, spread(wr), spread(lr)];
   };
 
-  document.getElementById('ws').innerHTML = relaxed
-    ? '<div class="warn" style="background:#450a0a;color:#fca5a5;font-size:.85rem;padding:10px;border-radius:8px;margin-bottom:10px">⚠️ Break rule disabled — not enough employees to satisfy 2-hour break constraints. Add more employees for a valid schedule.</div>'
-    : '';
+  document.getElementById('ws').innerHTML = '';
 
   const seen = new Set();
   const unique = candidates.filter(opt => {
