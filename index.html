@@ -232,6 +232,7 @@ function buildSchedule(emps, ct, closer, variant, noBreakRule = false, startTime
         if (cd.length) s.add(cd[variant % cd.length].name);
       }
       if (h===hours[0]) present.filter(e=>e.startBreak).forEach(e=>s.add(e.name));
+      if (h===hours[1]) present.filter(e=>e.startOneCon&&st[e.name].consec>=2).forEach(e=>s.add(e.name));
       return s;
     })();
     const canSlot = (e, slot) => {
