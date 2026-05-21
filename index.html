@@ -224,13 +224,14 @@ function buildSchedule(emps, ct, closer, variant, noBreakRule = false, startTime
   const genCandidates = (h, st) => {
     const isCT = h>=ct, isLast = e=>e.leaveTime===h+1;
     const present = emps.filter(e=>e.leaveTime>h);
-    const mustBrk = noBreakRule ? new Set() : (() => {
-      const s = new Set(present.filter(e=>st[e.name].consec>=2).map(e=>e.name));
-      if (h===7 && !noForce7) {
+    const mustBrk = (() => {
+      const s = noBreakRule ? new Set() : new Set(present.filter(e=>st[e.name].consec>=2).map(e=>e.name));
+      if (!noBreakRule && h===7 && !noForce7) {
         const cd = present.filter(e=>e.name!==closer&&e.leaveTime>9&&!e.noDesk)
           .sort((a,b)=>a.name.localeCompare(b.name));
         if (cd.length) s.add(cd[variant % cd.length].name);
       }
+      if (h===hours[0]) present.filter(e=>e.startBreak).forEach(e=>s.add(e.name));
       return s;
     })();
     const canSlot = (e, slot) => {
