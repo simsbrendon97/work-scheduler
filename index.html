@@ -505,23 +505,19 @@ function editName(td, optIdx, oldName) {
 
 function renderPositionTable(emps, sched, startTime = 2) {
   const hours = Array.from({length: 10 - startTime}, (_, i) => startTime + i);
-  const positions = ['local','ground','desk','combined','break'];
-  const posLabel = {local:'Local',ground:'Ground',desk:'Desk',combined:'Combined',break:'Break'};
-  const posCls = {local:'lo',ground:'gr',desk:'de',combined:'co',break:'br'};
-  const slotPos = sl => {
-    if (!sl || sl === undefined) return null;
-    if (sl === 'break') return 'break';
-    if (sl.includes('+')) return 'combined';
-    return sl;
-  };
+  const positions = ['local','ground','desk'];
+  const posLabel = {local:'Local',ground:'Ground',desk:'Desk'};
   let t = '<table><thead><tr><th style="font-size:.68rem;color:#9ca3af">Time</th>';
-  for (const pos of positions) t += `<th class="${posCls[pos]}">${posLabel[pos]}</th>`;
+  for (const pos of positions) t += `<th style="font-size:.68rem;color:#9ca3af">${posLabel[pos]}</th>`;
   t += '</tr></thead><tbody>';
   for (const h of hours) {
     t += `<tr><td style="font-size:.68rem;color:#9ca3af;background:#1f2937;white-space:nowrap">${h}–${h+1}</td>`;
     for (const pos of positions) {
-      const names = emps.filter(e => slotPos(sched[e.name][h]) === pos).map(e => e.name);
-      t += names.length ? `<td class="${posCls[pos]}">${names.join(', ')}</td>` : `<td class="of">—</td>`;
+      const names = emps.filter(e => {
+        const sl = sched[e.name][h];
+        return sl && sl !== 'break' && sl.split('+').includes(pos);
+      }).map(e => e.name);
+      t += names.length ? `<td>${names.join(', ')}</td>` : `<td class="of">—</td>`;
     }
     t += '</tr>';
   }
