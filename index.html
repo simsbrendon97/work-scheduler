@@ -76,7 +76,10 @@ th{background:#1f2937;color:#9ca3af;font-size:.68rem}
     <div class="li"><div class="ld co"></div>Combined</div>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
   </div>
   <div id="ws"></div>
-  <button class="btn btn-g" id="nextBtn" onclick="nextSched()" style="margin-bottom:12px">Regenerate</button>
+  <div class="row" style="gap:8px">
+    <button class="btn btn-g" id="nextBtn" onclick="nextSched()" style="margin-bottom:12px">Regenerate</button>
+    <button class="btn btn-g" id="viewBtn" onclick="toggleView()" style="margin-bottom:12px">Position View</button>
+  </div>
   <div id="schedOut"></div>
 </div>
 
@@ -378,6 +381,13 @@ function buildSchedule(emps, ct, closer, variant, noBreakRule = false, startTime
 
 let schedData = [];
 let curOpt = 0;
+let viewMode = 'normal';
+
+function toggleView() {
+  viewMode = viewMode === 'normal' ? 'position' : 'normal';
+  document.getElementById('viewBtn').textContent = viewMode === 'normal' ? 'Position View' : 'Employee View';
+  renderOpt(curOpt);
+}
 
 function renderOpt(i) {
   const opt = schedData[i];
@@ -388,8 +398,11 @@ function renderOpt(i) {
     if (b.leaveTime !== a.leaveTime) return b.leaveTime - a.leaveTime;
     return a.name.localeCompare(b.name);
   });
+  const table = viewMode === 'position'
+    ? renderPositionTable(sorted, opt.sched, opt.startTime)
+    : renderTable(sorted, opt.sched, i, opt.startTime);
   document.getElementById('schedOut').innerHTML =
-    '<div class="scroll">' + renderTable(sorted, opt.sched, i, opt.startTime) + '</div>' + renderStats(sorted);
+    '<div class="scroll">' + table + '</div>' + renderStats(sorted);
   const btn = document.getElementById('nextBtn');
   if (schedData.length > 1) {
     btn.textContent = 'Regenerate';
@@ -488,6 +501,31 @@ function editName(td, optIdx, oldName) {
   td.textContent = '';
   td.appendChild(inp);
   inp.focus(); inp.select();
+}
+
+function renderPositionTable(emps, sched, startTime = 2) {
+  const hours = Array.from({length: 10 - startTime}, (_, i) => startTime + i);
+  const positions = ['local','ground','desk','combined','break'];
+  const posLabel = {local:'Local',ground:'Ground',desk:'Desk',combined:'Combined',break:'Break'};
+  const posCls = {local:'lo',ground:'gr',desk:'de',combined:'co',break:'br'};
+  const slotPos = sl => {
+    if (!sl || sl === undefined) return null;
+    if (sl === 'break') return 'break';
+    if (sl.includes('+')) return 'combined';
+    return sl;
+  };
+  let t = '<table><thead><tr><th style="font-size:.68rem;color:#9ca3af">Time</th>';
+  for (const pos of positions) t += `<th class="${posCls[pos]}">${posLabel[pos]}</th>`;
+  t += '</tr></thead><tbody>';
+  for (const h of hours) {
+    t += `<tr><td style="font-size:.68rem;color:#9ca3af;background:#1f2937;white-space:nowrap">${h}–${h+1}</td>`;
+    for (const pos of positions) {
+      const names = emps.filter(e => slotPos(sched[e.name][h]) === pos).map(e => e.name);
+      t += names.length ? `<td class="${posCls[pos]}">${names.join(', ')}</td>` : `<td class="of">—</td>`;
+    }
+    t += '</tr>';
+  }
+  return t + '</tbody></table>';
 }
 
 function renderTable(emps, sched, optIdx, startTime = 2) {
